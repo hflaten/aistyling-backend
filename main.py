@@ -3,29 +3,50 @@ from pydantic import BaseModel
 import os
 import replicate
 from dotenv import load_dotenv
+from typing import List, Optional
 
-# Last inn API-nøkkelen fra .env-filen
+# Load environment variables
 load_dotenv()
 
-# Initialiser FastAPI og Replicate-klienten
+# Initialize FastAPI
 app = FastAPI()
-replicate_client = replicate.Client(api_token=os.getenv("REPLICATE_API_TOKEN"))
 
-# Definer dataformatet vi tar imot fra brukeren
+# Setup Replicate client
+REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
+if not REPLICATE_API_TOKEN:
+    raise ValueError("REPLICATE_API_TOKEN is not set in environment variables")
+
+replicate_client = replicate.Client(api_token=REPLICATE_API_TOKEN)
+
+# Define request schema
 class Prompt(BaseModel):
     prompt: str
+    width: Optional[int] = 512
+    height: Optional[int] = 512
+    num_outputs: Optional[int] = 1
 
-# Endepunkt for å generere bilde med Stable Diffusion
-@app.post("/generate")
+# Define response schema
+class ImageResponse(BaseModel):
+    image_urls: List[str]
+
+# Endpoint to generate image
+@app.post("/generate", response_model=ImageResponse)
 def generate_image(data: Prompt):
     try:
         output = replicate_client.run(
-            "stability-ai/stable-diffusion@ac732df83cea7fff18b8472768c88ad041fa750ff7682a21affe81863cbe77e4",
+            "stability-ai/stable-diffusion",
             input={
                 "prompt": data.prompt,
-                "scheduler": "K_EULER"
+                "width": data.width,
+                "height": data.height,
+                "num_outputs": data.num_outputs
             }
         )
-        return {"image_url": output}
+
+        if isinstance(output, list):
+            return {"image_urls": output}
+        else:
+            return {"image_urls": [output]}
+
     except Exception as e:
-        return {"error": str(e)}
+        return {"image_urls": [f"Error: {str(e)}"]}
