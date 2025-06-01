@@ -1,26 +1,30 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import replicate
 import os
 from dotenv import load_dotenv
 from typing import List, Union
-from fastapi.middleware.cors import CORSMiddleware
 
-# Start FastAPI-appen tidlig
+load_dotenv()
+
+# 🚀 Start FastAPI først
 app = FastAPI()
 
-# CORS settings – frontend-URL fra nettleser
+# ✅ Tillat riktig frontend-URL
 origins = [
-    "https://verbose-fiesta-v65pqq949jwp3pp5j-5173.app.github.dev/",  # ← bytt ut ved behov
+    "https://verbose-fiesta-v65pqq949jwp3pp5j-5173.app.github.dev"
 ]
 
+# 🔐 Legg til CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # eller ["*"] for testing
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Last inn miljøvariabler
 load_dotenv()
