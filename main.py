@@ -1,38 +1,37 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import os
 import replicate
+import os
 from dotenv import load_dotenv
 from typing import List
 
 # Load environment variables
 load_dotenv()
 
-# Initialize FastAPI
+# Initialize FastAPI app
 app = FastAPI()
 
-# Setup Replicate client
+# Validate API token exists
 REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
 if not REPLICATE_API_TOKEN:
-    raise RuntimeError("REPLICATE_API_TOKEN is not set in environment variables")
+    raise RuntimeError("REPLICATE_API_TOKEN is not set. Please check your environment variables or .env file.")
 
-client = replicate.Client(api_token=REPLICATE_API_TOKEN)
-
-# Define request schema
+# Define input schema
 class Prompt(BaseModel):
     prompt: str
 
-# Define response schema
+# Define output schema
 class ImageResponse(BaseModel):
     image_urls: List[str]
 
-# Endpoint to generate image
+# Image generation endpoint
 @app.post("/generate", response_model=ImageResponse)
 def generate_image(data: Prompt):
     try:
-        output = client.run(
-            "stability-ai/stable-diffusion@b3d14e1cd1f9470bbb0bb68cac48e5f483e5be309551992cc33dc30654a82bb7",
-            input={"prompt": data.prompt}
+        output = replicate.run(
+            "stability-ai/stable-diffusion",
+            input={"prompt": data.prompt},
+            api_token=REPLICATE_API_TOKEN
         )
 
         if isinstance(output, list):
@@ -41,4 +40,4 @@ def generate_image(data: Prompt):
             return {"image_urls": [output]}
 
     except Exception as e:
-        return {"image_urls": [f"Error: {str(e)}"]}
+        raise HTTPException(status_code=500, detail=str(e))
