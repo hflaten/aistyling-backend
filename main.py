@@ -4,19 +4,23 @@ import replicate
 import os
 from dotenv import load_dotenv
 
-load_dotenv()  # Laster miljøvariabler fra .env
+load_dotenv()
 
 app = FastAPI()
 
-replicate.Client(api_token=os.getenv("REPLICATE_API_TOKEN"))
+# Sett API-token
+os.environ["REPLICATE_API_TOKEN"] = os.getenv("REPLICATE_API_TOKEN")
 
 class Prompt(BaseModel):
     prompt: str
 
 @app.post("/generate")
 def generate_image(data: Prompt):
-    output = replicate.run(
-        "stability-ai/stable-diffusion:latest",
-        input={"prompt": data.prompt}
-    )
-    return {"image_url": output}
+    try:
+        output = replicate.run(
+            "stability-ai/stable-diffusion:latest",
+            input={"prompt": data.prompt}
+        )
+        return {"image_url": output}
+    except Exception as e:
+        return {"error": str(e)}
