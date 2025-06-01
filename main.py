@@ -19,11 +19,13 @@ origins = [
 # 🔐 Legg til CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],  # ← Dette tillater ALLE domenet midlertidig
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
 
 
 # Last inn miljøvariabler
