@@ -6,11 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from typing import List, Union
 
+# Start FastAPI-appen
+app = FastAPI()
+
 # Last inn miljøvariabler fra .env
 load_dotenv()
 
-# Start FastAPI-appen
-app = FastAPI()
+
 
 # Hent frontend origin fra miljøvariabel
 frontend_origin = os.getenv("FRONTEND_ORIGIN")
