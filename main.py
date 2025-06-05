@@ -42,6 +42,13 @@ async def generate_image(
     user_image: UploadFile = File(...),
     product_image: UploadFile = File(...)
 ):
+    ALLOWED_TYPES = {"image/jpeg", "image/png"}
+
+    if user_image.content_type not in ALLOWED_TYPES:
+        raise HTTPException(status_code=400, detail="Unsupported user image type. Only JPEG and PNG are allowed.")
+
+    if product_image.content_type not in ALLOWED_TYPES:
+        raise HTTPException(status_code=400, detail="Unsupported product image type. Only JPEG and PNG are allowed.")
     try:
         # Midlertidig lagre bildene
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as user_temp:
