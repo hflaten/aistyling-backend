@@ -1,28 +1,23 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List, Union
 from dotenv import load_dotenv
+from typing import List
 import replicate
 import os
-import tempfile
 
-# 2. Sett opp FastAPI og CORS
 app = FastAPI()
 
-# 1. Last inn .env
 load_dotenv()
 
 REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN")
+MODEL_REF = "fofr/swapstyle"
 
 if not REPLICATE_API_TOKEN:
-    raise RuntimeError("REPLICATE_API_TOKEN er ikke satt. Sjekk .env")
+    raise RuntimeError("REPLICATE_API_TOKEN is not set")
 if not FRONTEND_ORIGIN:
-    raise RuntimeError("FRONTEND_ORIGIN er ikke satt. Sjekk .env")
-
-
+    raise RuntimeError("FRONTEND_ORIGIN is not set")
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,52 +27,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 3. Modellreferanse for Flux
-MODEL_REF = "flux-kontext-apps/multi-image-kontext-max"
+class ImageResponse(BaseModel):
+    image_urls: List[str]
 
-# 4. Endepunkt for bildegenerering
-@app.post("/generate")
+@app.post("/generate", response_model=ImageResponse)
 async def generate_image(
     prompt: str = Form(...),
     user_image: UploadFile = File(...),
     product_image: UploadFile = File(...)
 ):
-    ALLOWED_TYPES = {"image/jpeg", "image/png"}
-
-    if user_image.content_type not in ALLOWED_TYPES:
-        raise HTTPException(status_code=400, detail="Unsupported user image type. Only JPEG and PNG are allowed.")
-
-    if product_image.content_type not in ALLOWED_TYPES:
-        raise HTTPException(status_code=400, detail="Unsupported product image type. Only JPEG and PNG are allowed.")
     try:
-        # Midlertidig lagre bildene
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as user_temp:
-            user_temp.write(await user_image.read())
-            user_path = user_temp.name
+        # Lagre midlertidige bilder
+        user_image_bytes = await user_image.read()
+        product_image_bytes = await product_image.read()
 
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as product_temp:
-            product_temp.write(await product_image.read())
-            product_path = product_temp.name
+        # Last opp bildene til Replicate
+        user_image_url = replicate.files.upload(user_image_bytes)
+        product_image_url = replicate.files.upload(product_image_bytes)
 
-        # Kjør modellen
-        output: Union[List, object] = replicate.run(
+        output = replicate.run(
             MODEL_REF,
             input={
-                "image_1": open(user_path, "rb"),
-                "image_2": open(product_path, "rb"),
                 "prompt": prompt,
+                "input_image_1": user_image_url,
+                "input_image_2": product_image_url,
             },
         )
 
-        # Hent ut URL-er (Replicate returnerer som regel bare én)
-        def extract_url(item):
-            return getattr(item, "url", str(item))
-
-        urls = (
-            [extract_url(item) for item in output] if isinstance(output, list)
-            else [extract_url(output)]
-        )
-
+        # Returner bilde-URL-er
+        urls = [str(item) for item in output] if isinstance(output, list) else [str(output)]
         return {"image_urls": urls}
 
     except Exception as e:
