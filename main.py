@@ -1,28 +1,29 @@
-from fastapi import FastAPI, HTTPException, UploadFile, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
+from pydantic import BaseModel
 from typing import List, Union
+from dotenv import load_dotenv
 import replicate
 import os
 import tempfile
-import shutil
 
-# 🚀 Start FastAPI
+# 2. Sett opp FastAPI og CORS
 app = FastAPI()
 
-# 🔐 Last inn miljøvariabler
+# 1. Last inn .env
 load_dotenv()
 
 REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN")
 
 if not REPLICATE_API_TOKEN:
-    raise RuntimeError("REPLICATE_API_TOKEN er ikke satt.")
+    raise RuntimeError("REPLICATE_API_TOKEN er ikke satt. Sjekk .env")
 if not FRONTEND_ORIGIN:
-    raise RuntimeError("FRONTEND_ORIGIN er ikke satt.")
+    raise RuntimeError("FRONTEND_ORIGIN er ikke satt. Sjekk .env")
 
-# 🌐 CORS
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_ORIGIN],
@@ -31,45 +32,46 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🧠 Modellreferanse
+# 3. Modellreferanse for Flux
 MODEL_REF = "flux-kontext-apps/multi-image-kontext-max"
 
-# 🧰 Hjelpefunksjon: midlertidig lagre bilde
-def save_upload_file_temp(upload_file: UploadFile) -> str:
-    suffix = os.path.splitext(upload_file.filename)[-1]
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        shutil.copyfileobj(upload_file.file, tmp)
-        return tmp.name
-
-# 🎯 Endepunkt for bildegenerering
+# 4. Endepunkt for bildegenerering
 @app.post("/generate")
 async def generate_image(
     prompt: str = Form(...),
-    image: UploadFile = Form(...),
-    context_image: UploadFile = Form(...),
+    user_image: UploadFile = File(...),
+    product_image: UploadFile = File(...)
 ):
     try:
-        image_path = save_upload_file_temp(image)
-        context_path = save_upload_file_temp(context_image)
+        # Midlertidig lagre bildene
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as user_temp:
+            user_temp.write(await user_image.read())
+            user_path = user_temp.name
 
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as product_temp:
+            product_temp.write(await product_image.read())
+            product_path = product_temp.name
+
+        # Kjør modellen
         output: Union[List, object] = replicate.run(
             MODEL_REF,
             input={
+                "image_1": open(user_path, "rb"),
+                "image_2": open(product_path, "rb"),
                 "prompt": prompt,
-                "image": open(image_path, "rb"),
-                "context_image": open(context_path, "rb"),
             },
         )
 
+        # Hent ut URL-er (Replicate returnerer som regel bare én)
         def extract_url(item):
             return getattr(item, "url", str(item))
 
-        urls: List[str] = (
+        urls = (
             [extract_url(item) for item in output] if isinstance(output, list)
             else [extract_url(output)]
         )
 
-        return JSONResponse(content={"image_urls": urls})
+        return {"image_urls": urls}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
