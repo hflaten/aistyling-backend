@@ -1,17 +1,19 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Union
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
+from typing import List, Union
 import replicate
 import os
-import logging
+import tempfile
+import shutil
 
-# 🚀 1. Start appen
+# 🚀 Start FastAPI
 app = FastAPI()
 
-# 🔐 2. Last miljøvariabler
+# 🔐 Last inn miljøvariabler
 load_dotenv()
+
 REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN")
 
@@ -20,7 +22,7 @@ if not REPLICATE_API_TOKEN:
 if not FRONTEND_ORIGIN:
     raise RuntimeError("FRONTEND_ORIGIN er ikke satt.")
 
-# 🔄 3. Sett opp CORS
+# 🌐 CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_ORIGIN],
@@ -29,42 +31,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🧠 4. Modellreferanse (Stable Diffusion 1.5)
-MODEL_REF = "stability-ai/stable-diffusion:ac732df83cea7fff18b8472768c88ad041fa750ff7682a21affe81863cbe77e4"
+# 🧠 Modellreferanse
+MODEL_REF = "flux-kontext-apps/multi-image-kontext-max"
 
-# 🎯 5. Output-modell
-class ImageResponse(BaseModel):
-    image_urls: List[str]
+# 🧰 Hjelpefunksjon: midlertidig lagre bilde
+def save_upload_file_temp(upload_file: UploadFile) -> str:
+    suffix = os.path.splitext(upload_file.filename)[-1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        shutil.copyfileobj(upload_file.file, tmp)
+        return tmp.name
 
-# 🖼️ 6. Genererings-endepunkt
-@app.post("/generate", response_model=ImageResponse)
+# 🎯 Endepunkt for bildegenerering
+@app.post("/generate")
 async def generate_image(
     prompt: str = Form(...),
-    image: UploadFile = File(None)
+    image: UploadFile = Form(...),
+    context_image: UploadFile = Form(...),
 ):
     try:
-        input_data = {"prompt": prompt}
-
-        if image:
-            image_data = await image.read()
-            input_data["image"] = image_data
+        image_path = save_upload_file_temp(image)
+        context_path = save_upload_file_temp(context_image)
 
         output: Union[List, object] = replicate.run(
             MODEL_REF,
-            input=input_data
+            input={
+                "prompt": prompt,
+                "image": open(image_path, "rb"),
+                "context_image": open(context_path, "rb"),
+            },
         )
 
         def extract_url(item):
             return getattr(item, "url", str(item))
 
-        urls = (
-            [extract_url(item) for item in output]
-            if isinstance(output, list)
+        urls: List[str] = (
+            [extract_url(item) for item in output] if isinstance(output, list)
             else [extract_url(output)]
         )
 
-        return {"image_urls": urls}
+        return JSONResponse(content={"image_urls": urls})
 
     except Exception as e:
-        logging.exception("Feil under generering")
         raise HTTPException(status_code=500, detail=str(e))
