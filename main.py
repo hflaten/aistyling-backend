@@ -1,27 +1,21 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from dotenv import load_dotenv
 from typing import List, Union
+from dotenv import load_dotenv
 import replicate
 import os
 
-# 🚀 1. Start FastAPI først
+# 1. Last miljøvariabler og init app
+load_dotenv()
 app = FastAPI()
 
-# 🔒 2. Last inn miljøvariabler fra .env
-load_dotenv()
-
-# 🧭 3. Sjekk at API-token og frontend-opprinnelse finnes
 REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN")
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN")
+if not REPLICATE_API_TOKEN or not FRONTEND_ORIGIN:
+    raise RuntimeError("Missing required environment variables.")
 
-if not REPLICATE_API_TOKEN:
-    raise RuntimeError("REPLICATE_API_TOKEN er ikke satt. Sjekk .env eller Render-miljøet.")
-if not FRONTEND_ORIGIN:
-    raise RuntimeError("FRONTEND_ORIGIN er ikke satt. Sjekk .env eller Render-miljøet.")
-
-# 🌐 4. Legg til CORS etter at app er definert
+# 2. CORS-policy
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_ORIGIN],
@@ -30,26 +24,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🧠 5. Modellreferanse
+# 3. Modellreferanse
 MODEL_REF = "stability-ai/stable-diffusion:ac732df83cea7fff18b8472768c88ad041fa750ff7682a21affe81863cbe77e4"
 
-# ✏️ 6. Definer datastrukturer
-class Prompt(BaseModel):
-    prompt: str
-
-class ImageResponse(BaseModel):
-    image_urls: List[str]
-
-# 🎨 7. Endepunkt for bildegenerering
-@app.post("/generate", response_model=ImageResponse)
-def generate_image(data: Prompt):
+# 4. Endepunkt for generering
+@app.post("/generate")
+async def generate_image(
+    prompt: str = Form(...),
+    user_image: Union[UploadFile, None] = File(default=None),
+    product_image: Union[UploadFile, None] = File(default=None),
+):
     try:
-        raw_output: Union[List, object] = replicate.run(
-            MODEL_REF,
-            input={"prompt": data.prompt},
-        )
+        # ⚙️ Bygg input til modellen
+        input_data = {"prompt": prompt}
 
-        # Hjelpefunksjon for å trekke ut URL-er
+        if user_image:
+            input_data["image"] = await user_image.read()  # image-to-image med brukerbilde
+        elif product_image:
+            input_data["image"] = await product_image.read()  # image-to-image med produktbilde
+        # Hvis ingen bilde: kjør ren tekstprompt
+
+        # 🚀 Kjør modell
+        raw_output: Union[List, object] = replicate.run(MODEL_REF, input=input_data)
+
         def extract_url(item):
             return getattr(item, "url", str(item))
 
@@ -61,4 +58,4 @@ def generate_image(data: Prompt):
         return {"image_urls": urls}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Image generation failed: {e}")
