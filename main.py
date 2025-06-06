@@ -4,8 +4,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from typing import List, Optional
+from cloudinary_utils import upload_image_to_cloudinary
+
 import cloudinary.uploader
 import replicate
+import cloudinary_utils
 
 # Last inn .env-verdier
 load_dotenv()
@@ -43,11 +46,10 @@ async def generate_image(
             raise HTTPException(status_code=400, detail="Both user_image and product_image are required.")
 
         # Last opp til Cloudinary
-        user_image_upload = cloudinary.uploader.upload(user_image.file)
-        product_image_upload = cloudinary.uploader.upload(product_image.file)
-
-        user_image_url = user_image_upload.get("secure_url")
-        product_image_url = product_image_upload.get("secure_url")
+        user_image_bytes = await user_image.read()
+        product_image_bytes = await product_image.read()
+        user_image_url = upload_image_to_cloudinary(user_image_bytes)
+        product_image_url = upload_image_to_cloudinary(product_image_bytes)
 
         if not user_image_url or not product_image_url:
             raise HTTPException(status_code=500, detail="Failed to upload images to Cloudinary.")

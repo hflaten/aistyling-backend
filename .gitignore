@@ -1,3 +1,5 @@
 .env
 __pycache__/
 venv/
+tests/images/wro.PNG
+tests/images/arcteryx.PNG
