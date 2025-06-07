@@ -4,4 +4,5 @@ pydantic
 python-dotenv
 replicate
 python-multipart
-cloudinary
+cloudinary==1.44.0
+
