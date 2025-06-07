@@ -1,4 +1,5 @@
 import replicate
+from utils.cloudinary_utils import upload_image_to_cloudinary
 
 model = replicate.models.get("black-forest-labs/flux-kontext-max")
 

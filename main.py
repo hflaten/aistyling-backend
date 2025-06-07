@@ -4,7 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 import replicate
-from cloudinary_utils import upload_image_to_cloudinary
+from utils.cloudinary_utils import upload_image_to_cloudinary
+
 
 app = FastAPI()
 
