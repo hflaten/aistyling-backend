@@ -54,12 +54,20 @@ async def generate_image(
             }
         )
 
+        print("Raw output from model:", output)  # 👈 LEGG TIL DENNE
+
+        # Dynamisk håndtering av output-typer
         if isinstance(output, list):
             return {"image_urls": output}
         elif isinstance(output, str):
             return {"image_urls": [output]}
+        elif isinstance(output, dict) and "output" in output:
+            return {"image_urls": output["output"]}
         else:
-            return JSONResponse(status_code=500, content={"detail": "Unexpected output format from model"})
+            return JSONResponse(
+                status_code=500,
+                content={"detail": f"Unexpected output format from model: {type(output)} - {output}"}
+            )
 
     except Exception as e:
         print("Image generation failed:", str(e))
