@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from typing import Union
 import os
 import replicate
-from cloudinary_utils import upload_image_to_cloudinary
+from utils.cloudinary_utils import upload_image_to_cloudinary
 
 # Start FastAPI
 app = FastAPI()
