@@ -25,3 +25,24 @@ def combine_images(user_image_url: str, product_image_url: str) -> str:
 
     # Last opp kombinert bilde til Cloudinary
     return upload_pil_image_to_cloudinary(combined_image)
+def combine_images_from_urls(url1: str, url2: str) -> Image.Image:
+    """
+    Kombinerer to bilder fra URL-er side om side og returnerer et nytt PIL.Image.
+    """
+    response1 = requests.get(url1)
+    response2 = requests.get(url2)
+
+    img1 = Image.open(BytesIO(response1.content)).convert("RGBA")
+    img2 = Image.open(BytesIO(response2.content)).convert("RGBA")
+
+    # Tilpass høyde så begge matcher
+    height = max(img1.height, img2.height)
+    img1 = img1.resize((int(img1.width * height / img1.height), height))
+    img2 = img2.resize((int(img2.width * height / img2.height), height))
+
+    total_width = img1.width + img2.width
+    combined = Image.new("RGBA", (total_width, height))
+    combined.paste(img1, (0, 0))
+    combined.paste(img2, (img1.width, 0))
+
+    return combined
