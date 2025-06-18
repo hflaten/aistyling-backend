@@ -9,6 +9,7 @@ import replicate
 app = FastAPI()
 load_dotenv()
 
+print("FRONTEND_ORIGIN:", os.getenv("FRONTEND_ORIGIN"))
 
 # CORS-oppsett
 app.add_middleware(
@@ -49,7 +50,10 @@ async def generate_image(
             }
         )
 
-        return {"output_url": output}
+        return {"image_urls": [combined_image_url]}
+
+
+
 
     except Exception as e:
         return {"detail": str(e)}
