@@ -1,4 +1,5 @@
 import cloudinary
+import os
 import cloudinary.uploader
 from fastapi import UploadFile
 from PIL import Image
