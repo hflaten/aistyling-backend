@@ -3,7 +3,8 @@
 from PIL import Image
 import requests
 from io import BytesIO
-from cloudinary_utils import upload_pil_image_to_cloudinary
+from utils.cloudinary_utils import upload_pil_image_to_cloudinary
+
 
 def combine_images(user_image_url: str, product_image_url: str) -> str:
     # Last ned begge bildene
