@@ -55,5 +55,7 @@ async def generate_image(
 
 
 
+
+
     except Exception as e:
         return {"detail": str(e)}
