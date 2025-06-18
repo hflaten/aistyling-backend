@@ -6,3 +6,4 @@ replicate
 python-multipart
 cloudinary==1.44.0
 Pillow
+requests
